@@ -1,0 +1,120 @@
+---
+title: "Classification Tree/Random Forest"
+author: "Kyle Ditonto"
+output: pdf_document
+---
+
+```{r Cleaning Data}
+
+library(MASS)
+library(tree)
+library(randomForest) 
+library(ISLR)
+library(rpart)
+library(rpart.plot)
+election_data=read.csv('training_data_adj.csv')
+
+
+georgia_data=read.csv("Georgia_data.csv")
+election_data<-na.omit(election_data)
+#georgia.test <- georgia_data[,"DEM"]
+election_data$REP<-NULL
+#election_data$DEM<-NULL
+election_data$Registerd <- NULL
+election_data$county_name<-NULL
+election_data$State<-NULL
+#election_data$X..age.25.34<-NULL
+#election_data$X..age.35.44<-NULL
+#election_data$X..age.45.54<-NULL
+#election_data$X..age.55.64<-NULL
+#election_data$X..age.65.or.older<-NULL
+election_data$X<-NULL
+
+set.seed(1)
+train = sample(1:nrow(election_data),nrow(election_data)*.75)
+```
+
+```{r}
+# 2. Regression Trees
+tree.election <- tree(DEM~.,election_data,subset=train)
+summary(tree.election)
+plot(tree.election,type="uniform")
+text(tree.election,pretty=0)
+tree.election
+fit <- rpart(DEM~., data = election_data[train,], method="anova")
+rpart.plot(fit)
+
+
+
+election.test <- election_data[-train,"DEM"]
+tree.pred <- predict(tree.election, election_data[-train,])
+
+# MSE
+mean((election.test - tree.pred)^2)
+
+cv.election <- cv.tree(tree.election, K=10)
+cv.election
+
+plot(cv.election$size,cv.election$dev,type='b')
+```
+```{r}
+### Pruning
+
+# FUN defines metric used to determine the best alpha
+# prune.misclass; misclassification rate
+# prune.tree; deviance
+
+cv.election <- cv.tree(tree.election, FUN=prune.tree, K = 10)
+
+# dev gives the number of misclassifications for the corresponding tree
+
+names(cv.election)
+cv.election
+
+which.min(cv.election$dev)
+
+cv.election$size[which.min(cv.election$dev)]
+
+# best specifies the size of the tree we want to use
+
+prune.election <- prune.tree(tree.election,best = cv.election$size[which.min(cv.election$dev)])
+
+plot(prune.election)
+text(prune.election,pretty=0)
+
+prune.election
+
+prune.pred <- predict(prune.election, georgia_data, type = "tree")
+#mean(prune.pred == actual)
+print
+```
+
+
+```{r}
+# 3. Random Forests
+
+# By default the algorithmn selects p/3 features for each tree in regession
+# and sqrt(p) features in classification
+set.seed(1)
+georgia.test <- georgia_data[,"DEM"]
+
+rf.election <- randomForest(DEM~ .,data=election_data,subset=train,importance=TRUE)
+rf.election
+
+yhat.rf <- predict(rf.election,newdata=georgia_data)
+mean((yhat.rf-georgia.test)^2)
+
+# importance of our predictors
+importance(rf.election)
+varImpPlot(rf.election)
+
+# mtry sets the number of features that will be chosen per tree
+rf.election <- randomForest(DEM~.,data=election_data,subset=train,mtry=6,importance=TRUE)
+yhat.rf <- predict(rf.election,newdata=georgia_data)
+mean((yhat.rf-georgia.test)^2)
+
+# ntree sets the number of trees
+rf.election <- randomForest(DEM~.,data=election_data,subset=train,ntree=25,importance=TRUE)
+yhat.rf <- predict(rf.election,newdata=georgia_data)
+mean((yhat.rf-georgia.test)^2)
+```

@@ -1,0 +1,99 @@
+---
+title: "Boosted Trees"
+author: "Maximiliano Vedoya Ramirez"
+output: pdf_document
+---
+
+## Boosted Trees
+Cleaning Data
+```{r Cleaning Data}
+
+library(MASS)
+
+election_data=read.csv('training_data.csv')
+election_data<-na.omit(election_data)
+
+election_data$REP<-NULL
+election_data$county_name<-NULL
+election_data$State<-NULL
+election_data$Registerd<-NULL
+# election_data$X..age.25.34<-NULL
+# election_data$X..age.35.44<-NULL
+# election_data$X..age.45.54<-NULL
+# election_data$X..age.55.64<-NULL
+# election_data$X..age.65.or.older<-NULL
+election_data$X<-NULL
+
+set.seed(1)
+
+
+```
+
+
+## Selection of optimal number of trees. 
+```{r}
+# install.packages('gbm')
+library(gbm)
+mse<-rep(0,10)
+n_trees=c(1:10)*100
+
+for (i in c(1:10)){
+  boost_model = gbm(DEM~.,election_data,distribution = "gaussian", n.trees=i*100,interaction.depth=1,cv.folds = 10)
+  mse[i]<-mean(boost_model$cv.error)
+}
+
+plot(y=mse,x=n_trees,type='l',xlab = 'Number of Trees',ylab = 'Mean CV-10 Error' )
+best_ntrees<-which.min(mse)*100
+print(best_ntrees)
+```
+```{r}
+set.seed(1)
+boost_model = gbm(DEM~.,election_data,,distribution ="gaussian",
+                  n.trees=best_ntrees,interaction.depth=1,cv.folds = 10)
+summary(boost_model)
+mean(boost_model$cv.error)
+```
+```{r}
+
+ga_data<-read.csv('Georgia_data.csv')
+ga_data<-na.omit(ga_data)
+
+Dem_votes<-ga_data$Registerd*ga_data$DEM
+ga_registered<-ga_data$Registerd
+ga_counties<-ga_data$county_name
+
+
+ga_data$REP<-NULL
+ga_data$county_name<-NULL
+ga_data$Registerd<-NULL
+ga_data$State<-NULL
+# ga_data$X..age.25.34<-NULL
+# ga_data$X..age.35.44<-NULL
+# ga_data$X..age.45.54<-NULL
+# ga_data$X..age.55.64<-NULL
+# ga_data$X..age.65.or.older<-NULL
+ga_data$X<-NULL
+
+Predicted_votes<-predict(boost_model,newdata=ga_data,n.trees=best_ntrees,type="response")*ga_registered
+results<-data.frame(Potential=Predicted_votes, 
+                 Real=ga_data$DEM*ga_registered,
+                 county=ga_counties)
+results$Difference<-results$Real-results$Potential
+write.csv(results[order(-results$Difference),],'results.csv')
+```
+
+
+
+## Code Chunk 4
+```{r}
+
+
+
+
+```
+
+## Code Chunk 5
+```{r}
+
+```
+
